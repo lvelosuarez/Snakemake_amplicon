@@ -168,12 +168,12 @@ rule dada2_taxonomy:
     input:
         seqtab = rules.filterLength.output.rds
     output:
-        tax =temp(config["path"] + "output/tax_silva.rds")
+        tax = temp(config["path"] + "output/tax_silva.rds")
     params:
         silva = config['silva'],
         silva_species = config['silva_species']
     log:
-        "logs/dada2/tax.txt"
+        config["path"] + "logs/dada2/tax.txt"
     conda:
         "envs/dada2.yaml"
     script:
