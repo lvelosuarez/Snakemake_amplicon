@@ -12,7 +12,8 @@ rule all:
         config["path"] + "output/seqs.fasta", 
         config["path"] + "output/seqtab.tsv", 
         config["path"] + "output/results.rds",
-        config["path"] + "stats/Nreads.tsv"
+       # config["path"] + "stats/Nreads.tsv",
+        config["path"] + "output/tax_gtdb.rds"
 rule QC:
     input:
         r1 = lambda wildcards: SampleTable.loc[wildcards.sample, 'R1'],
@@ -182,6 +183,21 @@ rule dada2_taxonomy:
     script:
         "scripts/dada2/taxonomydada2.R"
         
+rule ID_taxa:
+    input:
+        seqtab = rules.filterLength.output.rds,
+    output:
+        taxonomy= config["path"] + "output/tax_gtdb.rds"
+    params:
+        GTDB = config['GTDB']
+    threads:
+        config['threads']
+    log:
+        config["path"] + "logs/dada2/IDtaxa_gtdb.txt"
+    script:
+        "scripts/dada2/IDtaxa.R"
+        
+        
 rule dada2_end:
     input:
         seqtab = rules.filterLength.output.rds,
@@ -213,6 +229,8 @@ rule combine_read_counts:
         D= D.join(pd.read_table(input[1],index_col=0))
         D= D.join(pd.read_table(input[2],squeeze=True,index_col=0))
 
+        
+        
         D.to_csv(output[0],sep='\t')
         matplotlib.rcParams['pdf.fonttype']=42
         D.plot.bar(width=0.7,figsize=(D.shape[0]*0.3,5))
