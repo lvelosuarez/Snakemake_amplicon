@@ -2,6 +2,9 @@ import os
 import pandas as pd
 SampleTable = pd.read_table(config['sampletable'],index_col=0)
 SAMPLES = list(SampleTable.index)
+PAIRED_END= ('R2' in SampleTable.columns)
+FRACTIONS= ['R1']
+if PAIRED_END: FRACTIONS+= ['R2']
 
 
 rule all:
@@ -12,8 +15,8 @@ rule all:
         config["path"] + "stats/Nreads.tsv"
 rule QC:
     input:
-        r1 = config["path"] + "00_RAW/{sample}_R1.fastq.gz",
-        r2 = config["path"] + "00_RAW/{sample}_R2.fastq.gz"
+        r1 = lambda wildcards: SampleTable.loc[wildcards.sample, 'R1'],
+        r2 = lambda wildcards: SampleTable.loc[wildcards.sample, 'R2']
     output:
         r1 = config["path"] + "quality/{sample}_R1.fastq.gz",
         r2 = config["path"] + "quality/{sample}_R2.fastq.gz"
