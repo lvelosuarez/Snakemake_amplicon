@@ -187,7 +187,7 @@ rule ID_taxa:
     input:
         seqtab = rules.filterLength.output.rds,
     output:
-        taxonomy= config["path"] + "output/tax_gtdb.rds"
+        taxonomy= config["path"] + "output/tax_gtdb.txt"
     params:
         GTDB = config['GTDB']
     threads:
