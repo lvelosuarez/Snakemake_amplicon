@@ -1,5 +1,7 @@
 library(dada2)
 library(DECIPHER)
+library(tidyverse)
+library(magrittr)
 sink(snakemake@log[[1]])
 
 seqtab= readRDS(snakemake@input[['seqtab']]) # seqtab
@@ -16,4 +18,5 @@ taxid <- t(sapply(ids, function(x) {
   taxa
 }))
 colnames(taxid) <- ranks; rownames(taxid) <- getSequences(seqtab)
-saveRDS(taxid,snakemake@output[['taxonomy']],sep='\t')
+taxid %<>% as.data.frame() %>% rownames_to_column(var="seqs")
+saveRDS(taxid,snakemake@output[['taxonomy']])

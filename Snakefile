@@ -12,7 +12,7 @@ rule all:
         config["path"] + "output/seqs.fasta", 
         config["path"] + "output/seqtab.tsv", 
         config["path"] + "output/results.rds",
-       # config["path"] + "stats/Nreads.tsv",
+        config["path"] + "stats/Nreads.tsv",
         config["path"] + "output/tax_gtdb.rds"
 rule QC:
     input:
@@ -187,7 +187,7 @@ rule ID_taxa:
     input:
         seqtab = rules.filterLength.output.rds,
     output:
-        taxonomy= config["path"] + "output/tax_gtdb.txt"
+        taxonomy= config["path"] + "output/tax_gtdb.rds"
     params:
         GTDB = config['GTDB']
     threads:
