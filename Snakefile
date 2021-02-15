@@ -6,14 +6,16 @@ PAIRED_END= ('R2' in SampleTable.columns)
 FRACTIONS= ['R1']
 if PAIRED_END: FRACTIONS+= ['R2']
 
-
 rule all:
     input:
         config["path"] + "output/seqs.fasta", 
         config["path"] + "output/seqtab.tsv", 
         config["path"] + "output/results.rds",
-        config["path"] + "stats/Nreads.tsv",
+        config["path"] + "output/Nreads.tsv",
         config["path"] + "output/tax_gtdb.rds"
+
+include: "rules/count.smk"        
+
 rule QC:
     input:
         r1 = lambda wildcards: SampleTable.loc[wildcards.sample, 'R1'],
@@ -30,16 +32,16 @@ rule CutPrimers:
     input:
         r1 = config["path"] + "quality/{sample}_R1.fastq.gz",
         r2 = config["path"] + "quality/{sample}_R2.fastq.gz"
-       
     output:
         r1 = config["path"] + "adapters/{sample}_R1.fastq.gz",
         r2 = config["path"] + "adapters/{sample}_R2.fastq.gz"
     params:
-        forward = config["FORWARD"],
-        reverse = config["REVERSE"]
+        primer_f = config["FORWARD"],
+        primer_r = config["REVERSE"]
     shell:
-        "cutadapt --discard-untrimmed -g ^{params.forward}  -G ^{params.reverse} -o {output.r1} -p {output.r2} {input.r1} {input.r2}"        
+        "cutadapt --discard-untrimmed -g ^{params.primer_f}  -G ^{params.primer_r} -o {output.r1} -p {output.r2} {input.r1} {input.r2}"   
 
+        
 rule dada2_filter:
     input:
         r1 =  expand(config["path"] + "adapters/{sample}_R1.fastq.gz",sample=SAMPLES),
@@ -47,7 +49,7 @@ rule dada2_filter:
     output:
         r1 = expand(config["path"] + "dada2_filtered/{sample}_R1.fastq.gz",sample=SAMPLES),
         r2 = expand(config["path"] + "dada2_filtered/{sample}_R2.fastq.gz",sample=SAMPLES),
-        nreads= temp(config["path"] + "stats/Nreads_filtered.txt")
+        nreads= temp(config["path"] + "output/Nreads_filtered.txt")
     params:
         samples=SAMPLES
     threads:
@@ -85,7 +87,7 @@ rule dereplicate:
         err_r2 = rules.learnErrorRates.output.err_r2
     output:
         seqtab = temp(config["path"] + "output/seqtab_with_chimeras.rds"),
-        nreads = temp(config["path"] + "stats/Nreads_dereplicated.txt")
+        nreads = temp(config["path"] + "output/Nreads_dereplicated.txt")
     params:
         samples = SAMPLES
     threads:
@@ -102,7 +104,7 @@ rule removeChimeras:
         seqtab = rules.dereplicate.output.seqtab
     output:
         seqtab = temp(config["path"] + "output/seqtab_nochimeras.rds"),
-        nreads =temp(config["path"] + "stats/Nreads_chimera_removed.txt")
+        nreads = temp(config["path"] + "output/Nreads_chimera_removed.txt")
     threads:
         config['threads']
     conda:
@@ -192,6 +194,8 @@ rule ID_taxa:
         GTDB = config['GTDB']
     threads:
         config['threads']
+    conda:
+        "envs/dada2.yaml"
     log:
         config["path"] + "logs/dada2/IDtaxa_gtdb.txt"
     script:
@@ -214,28 +218,26 @@ rule dada2_end:
         
 rule combine_read_counts:
     input:
-        config["path"] + 'stats/Nreads_filtered.txt',
-        config["path"] + 'stats/Nreads_dereplicated.txt',
-        config["path"] + 'stats/Nreads_chimera_removed.txt'
+        config["path"] + 'output/Nreads_raw.txt',
+        config["path"] + 'output/Nreads_quality.txt',
+        config["path"] + 'output/Nreads_adapters.txt',
+        config["path"] + 'output/Nreads_filtered.txt',
+        config["path"] + 'output/Nreads_dereplicated.txt',
+        config["path"] + 'output/Nreads_chimera_removed.txt'
     output:
-        config["path"] + 'stats/Nreads.tsv',
-        plot = config["path"] + 'stats/Nreads.pdf'
+        config["path"] + 'output/Nreads.tsv',
     run:
         import pandas as pd
         import matplotlib
         import matplotlib.pylab as plt
 
-        D= pd.read_table(input[0],index_col=0)
-        D= D.join(pd.read_table(input[1],index_col=0))
-        D= D.join(pd.read_table(input[2],squeeze=True,index_col=0))
-
-        
-        
+        D = pd.read_table(input[0],sep=",",names=['00_raw'],index_col=0)
+        D = D.join(pd.read_table(input[1],sep=",",names=['quality'],index_col=0))
+        D = D.join(pd.read_table(input[2],sep=",",names=['adaptors'],index_col=0))
+        D = D.join(pd.read_table(input[3],index_col=0))
+        D = D.join(pd.read_table(input[4],index_col=0))
+        D = D.join(pd.read_table(input[5],squeeze=True,index_col=0))
+        D = D[['00_raw','quality','adaptors','filtered','denoised','merged','nonchim']]
         D.to_csv(output[0],sep='\t')
-        matplotlib.rcParams['pdf.fonttype']=42
-        D.plot.bar(width=0.7,figsize=(D.shape[0]*0.3,5))
-        plt.ylabel('N reads')
-        plt.savefig(output.plot)
-
 onsuccess:
     print(":) HAPPY")
