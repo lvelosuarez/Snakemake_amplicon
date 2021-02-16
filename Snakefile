@@ -1,18 +1,17 @@
+report: config["path"] + "workflow.rst"
+
 import os
 import pandas as pd
 SampleTable = pd.read_table(config['sampletable'],index_col=0)
 SAMPLES = list(SampleTable.index)
-PAIRED_END= ('R2' in SampleTable.columns)
-FRACTIONS= ['R1']
-if PAIRED_END: FRACTIONS+= ['R2']
-
+    
 rule all:
     input:
-        config["path"] + "output/seqs.fasta", 
-        config["path"] + "output/seqtab.tsv", 
+        config["path"] + "output/results.fasta", 
         config["path"] + "output/results.rds",
-        config["path"] + "output/Nreads.tsv",
-        config["path"] + "output/tax_gtdb.rds"
+        config["path"] + "output/tax_gtdb.rds",
+        config["path"] + "output/tax_silva.rds",
+        config["path"] + "output/Nreads.tsv"
 
 include: "rules/count.smk"        
 
@@ -160,7 +159,6 @@ rule filterLength:
         plot_seqlength = config["path"] + "figures/Lengths/Sequence_Length_distribution.pdf",
         plot_seqabundance = config["path"] + "figures/Lengths/Sequence_Length_distribution_abundance.pdf",
         rds= temp(config["path"] + "output/seqtab.rds"),
-        tsv=  config["path"] + "output/seqtab.tsv",
     threads:
         1
     conda:
@@ -174,7 +172,7 @@ rule dada2_taxonomy:
     input:
         seqtab = rules.filterLength.output.rds
     output:
-        tax = temp(config["path"] + "output/tax_silva.rds")
+        tax = config["path"] + "output/tax_silva.rds"
     params:
         silva = config['silva'],
         silva_species = config['silva_species']
@@ -207,7 +205,7 @@ rule dada2_end:
         seqtab = rules.filterLength.output.rds,
         tax = rules.dada2_taxonomy.output.tax
     output:
-        fasta = config["path"] + "output/seqs.fasta",
+        fasta = config["path"] + "output/results.fasta",
         rds = config["path"] + "output/results.rds"
     conda:
         "envs/dada2.yaml"
@@ -225,7 +223,7 @@ rule combine_read_counts:
         config["path"] + 'output/Nreads_dereplicated.txt',
         config["path"] + 'output/Nreads_chimera_removed.txt'
     output:
-        config["path"] + 'output/Nreads.tsv',
+        report(config["path"] + 'output/Nreads.tsv',category="read lost")
     run:
         import pandas as pd
         import matplotlib
