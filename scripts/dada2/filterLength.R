@@ -2,7 +2,6 @@ library(dada2)
 library(ggplot2)
 
 sink(snakemake@log[[1]])
-
 seqtab= readRDS(snakemake@input[['seqtab']]) # seqtab
 
 # Length of sequences
@@ -47,11 +46,6 @@ right_length= abs(seq_lengths- most_common_length)< max_diff
 seqtab=seqtab[,right_length]
 
 saveRDS(seqtab, snakemake@output[['rds']]) 
-write.table(seqtab,snakemake@output[['tsv']],sep =  "\t")
-
-  
-
-
 removed_fraction = sum(table2[!abs(as.numeric(table2$LENGTH)- most_common_length) <max_diff, 'ABUNDANCE']) / sum(table2$ABUNDANCE)
 
 print(paste0(removed_fraction," sequence are removed because they are shorter than expected: ",most_common_length,"+-", max_diff )  )
