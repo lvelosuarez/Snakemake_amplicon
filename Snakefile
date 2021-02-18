@@ -1,4 +1,4 @@
-report: config["path"] + "workflow.rst"
+report: config["path"] + "report/workflow.rst"
 
 import os
 import pandas as pd
@@ -9,11 +9,14 @@ rule all:
     input:
         config["path"] + "output/results.fasta", 
         config["path"] + "output/results.rds",
+        config["path"] + "output/seqtab_dbOTU.rds",
         config["path"] + "output/tax_gtdb.rds",
         config["path"] + "output/tax_silva.rds",
-        config["path"] + "output/Nreads.tsv"
+        config["path"] + "output/Nreads.csv",
+        
 
-include: "rules/count.smk"        
+include: "rules/count.smk"
+#include: "rules/qiime.smk"
 
 rule QC:
     input:
@@ -58,7 +61,7 @@ rule dada2_filter:
     log:
         config["path"] + "logs/dada2/filter.txt"
     script:
-        "scripts/dada2/filter.R"
+        "scripts/dada2/filter_dada.R"
         
 rule learnErrorRates:
     input:
@@ -67,8 +70,8 @@ rule learnErrorRates:
     output:
         err_r1= config["path"] + "model/ErrorRates_r1.rds",
         err_r2 = config["path"] + "model/ErrorRates_r2.rds",
-        plotErr1 = config["path"] + "figures/ErrorRates_r1.pdf",
-        plotErr2 = config["path"] + "figures/ErrorRates_r2.pdf"
+        plotErr1 = report(config["path"] + "figures/ErrorRates_r1.png",category="QC reads"),
+        plotErr2 = report(config["path"] + "figures/ErrorRates_r2.png",category="QC reads")
     threads:
         config['threads']
     conda:
@@ -143,7 +146,7 @@ rule import_dbOTU:
         dbOTU = rules.dbOTU.output.tsv_out,
         seqtab = rules.removeChimeras.output.seqtab
     output:
-        rds = temp(config["path"] + "output/seqtab_dbOTU.rds")
+        rds = config["path"] + "output/seqtab_dbOTU.rds"
     conda:
         "envs/dada2.yaml"
     log:
@@ -151,26 +154,9 @@ rule import_dbOTU:
     script:
         "scripts/dada2/dbOTU_into.R"
         
-        
-rule filterLength:
-    input:
-        seqtab= rules.import_dbOTU.output.rds
-    output:
-        plot_seqlength = config["path"] + "figures/Lengths/Sequence_Length_distribution.pdf",
-        plot_seqabundance = config["path"] + "figures/Lengths/Sequence_Length_distribution_abundance.pdf",
-        rds= temp(config["path"] + "output/seqtab.rds"),
-    threads:
-        1
-    conda:
-        "envs/dada2.yaml"
-    log:
-        config["path"] + "logs/dada2/filterLength.txt"
-    script:
-        "scripts/dada2/filterLength.R"
-
 rule dada2_taxonomy:
     input:
-        seqtab = rules.filterLength.output.rds
+        seqtab = rules.import_dbOTU.output.rds
     output:
         tax = config["path"] + "output/tax_silva.rds"
     params:
@@ -185,7 +171,7 @@ rule dada2_taxonomy:
         
 rule ID_taxa:
     input:
-        seqtab = rules.filterLength.output.rds,
+        seqtab = rules.import_dbOTU.output.rds
     output:
         taxonomy= config["path"] + "output/tax_gtdb.rds"
     params:
@@ -198,21 +184,25 @@ rule ID_taxa:
         config["path"] + "logs/dada2/IDtaxa_gtdb.txt"
     script:
         "scripts/dada2/IDtaxa.R"
-        
-        
-rule dada2_end:
+                
+rule filter_f:
     input:
-        seqtab = rules.filterLength.output.rds,
+        seqtab = rules.import_dbOTU.output.rds,
         tax = rules.dada2_taxonomy.output.tax
     output:
+        plot_seqlength_nofilter = report(config["path"] + "figures/Sequence_Length_distribution.png", category="QC reads"),
+        plot_seqabundance_nofilter = report(config["path"] + "figures/Sequence_Length_distribution_abundance.png", category ="QC reads"),
+        plot_seqlength = report(config["path"] + "figures/Sequence_Length_distribution_filtered.png", category="QC reads"),
+        plot_seqabundance = report(config["path"] + "figures/Sequence_Length_distribution_abundance_filtered.png", category ="QC reads"),
         fasta = config["path"] + "output/results.fasta",
-        rds = config["path"] + "output/results.rds"
+        nreads= temp(config["path"] + "output/Nreads_length.txt"),
+        rds = config["path"] + "output/results.rds",
     conda:
         "envs/dada2.yaml"
     log:
-        log1 = config["path"] + "logs/dada2_end.log"
+        config["path"] + "logs/dada2/filter.txt"
     script:
-        "scripts/dada2/dada2_end.R"
+        "scripts/dada2/filter.R"
         
 rule combine_read_counts:
     input:
@@ -221,21 +211,23 @@ rule combine_read_counts:
         config["path"] + 'output/Nreads_adapters.txt',
         config["path"] + 'output/Nreads_filtered.txt',
         config["path"] + 'output/Nreads_dereplicated.txt',
-        config["path"] + 'output/Nreads_chimera_removed.txt'
+        config["path"] + 'output/Nreads_chimera_removed.txt',
+        config["path"] + "output/Nreads_length.txt"
     output:
-        report(config["path"] + 'output/Nreads.tsv',category="read lost")
+        report(config["path"] + 'output/Nreads.csv', category="QC reads")
     run:
         import pandas as pd
         import matplotlib
         import matplotlib.pylab as plt
 
-        D = pd.read_table(input[0],sep=",",names=['00_raw'],index_col=0)
+        D = pd.read_table(input[0],sep=",",names=['gatc'],index_col=0)
         D = D.join(pd.read_table(input[1],sep=",",names=['quality'],index_col=0))
         D = D.join(pd.read_table(input[2],sep=",",names=['adaptors'],index_col=0))
         D = D.join(pd.read_table(input[3],index_col=0))
         D = D.join(pd.read_table(input[4],index_col=0))
         D = D.join(pd.read_table(input[5],squeeze=True,index_col=0))
-        D = D[['00_raw','quality','adaptors','filtered','denoised','merged','nonchim']]
-        D.to_csv(output[0],sep='\t')
+        D = D.join(pd.read_table(input[6],index_col=1))
+        D = D[['gatc','quality','adaptors','filtered','denoised','merged','nonchim','tax_filter']]
+        D.to_csv(output[0],sep=',')
 onsuccess:
     print(":) HAPPY")
