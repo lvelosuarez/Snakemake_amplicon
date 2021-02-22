@@ -1,3 +1,4 @@
+#!/usr/bin/Rscript
 suppressPackageStartupMessages(library(tidyverse))
 sink(snakemake@log[[1]])
 

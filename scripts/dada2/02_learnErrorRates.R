@@ -1,5 +1,6 @@
-library(dada2)
-library(ggplot2)
+#!/usr/bin/Rscript
+suppressPackageStartupMessages(library(dada2))
+suppressPackageStartupMessages(library(ggplot2))
 sink(snakemake@log[[1]])
 
 
@@ -8,8 +9,6 @@ errR <- learnErrors(snakemake@input[['r2']], nbases=snakemake@config[["learn_nba
 
 save(errF,file=snakemake@output[['err_r1']])
 save(errR,file=snakemake@output[['err_r2']])
-
-
 
 ## ---- plot-rates ----
 plotErrors(errF,nominalQ=TRUE)

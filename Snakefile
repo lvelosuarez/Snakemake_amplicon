@@ -24,8 +24,8 @@ rule QC:
         r1 = lambda wildcards: SampleTable.loc[wildcards.sample, 'R1'],
         r2 = lambda wildcards: SampleTable.loc[wildcards.sample, 'R2']
     output:
-        r1 = config["path"] + "quality/{sample}_R1.fastq.gz",
-        r2 = config["path"] + "quality/{sample}_R2.fastq.gz"
+        r1 = config["path"] + "01_quality/{sample}_R1.fastq.gz",
+        r2 = config["path"] + "01_quality/{sample}_R2.fastq.gz"
     params:
         adapters = os.path.abspath("../../Useful_Files/adapters.fa"),
     shell:
@@ -33,11 +33,11 @@ rule QC:
 
 rule CutPrimers:
     input:
-        r1 = config["path"] + "quality/{sample}_R1.fastq.gz",
-        r2 = config["path"] + "quality/{sample}_R2.fastq.gz"
+        r1 = config["path"] + "01_quality/{sample}_R1.fastq.gz",
+        r2 = config["path"] + "01_quality/{sample}_R2.fastq.gz"
     output:
-        r1 = config["path"] + "adapters/{sample}_R1.fastq.gz",
-        r2 = config["path"] + "adapters/{sample}_R2.fastq.gz"
+        r1 = config["path"] + "02_adapters/{sample}_R1.fastq.gz",
+        r2 = config["path"] + "02_adapters/{sample}_R2.fastq.gz"
     params:
         primer_f = config["FORWARD"],
         primer_r = config["REVERSE"]
@@ -47,11 +47,11 @@ rule CutPrimers:
         
 rule dada2_filter:
     input:
-        r1 =  expand(config["path"] + "adapters/{sample}_R1.fastq.gz",sample=SAMPLES),
-        r2 =  expand(config["path"] + "adapters/{sample}_R2.fastq.gz",sample=SAMPLES)
+        r1 =  expand(config["path"] + "02_adapters/{sample}_R1.fastq.gz",sample=SAMPLES),
+        r2 =  expand(config["path"] + "02_adapters/{sample}_R2.fastq.gz",sample=SAMPLES)
     output:
-        r1 = expand(config["path"] + "dada2_filtered/{sample}_R1.fastq.gz",sample=SAMPLES),
-        r2 = expand(config["path"] + "dada2_filtered/{sample}_R2.fastq.gz",sample=SAMPLES),
+        r1 = expand(config["path"] + "03_dada2_filtered/{sample}_R1.fastq.gz",sample=SAMPLES),
+        r2 = expand(config["path"] + "03_dada2_filtered/{sample}_R2.fastq.gz",sample=SAMPLES),
         nreads= temp(config["path"] + "output/Nreads_filtered.txt")
     params:
         samples=SAMPLES
@@ -62,15 +62,15 @@ rule dada2_filter:
     log:
         config["path"] + "logs/dada2/filter.txt"
     script:
-        "scripts/dada2/filter_dada.R"
+        "scripts/dada2/01_filter_dada.R"
         
 rule learnErrorRates:
     input:
         r1= rules.dada2_filter.output.r1,
         r2= rules.dada2_filter.output.r2
     output:
-        err_r1= config["path"] + "model/ErrorRates_r1.rds",
-        err_r2 = config["path"] + "model/ErrorRates_r2.rds",
+        err_r1= config["path"] + "04_model/ErrorRates_r1.rds",
+        err_r2 = config["path"] + "04_model/ErrorRates_r2.rds",
         plotErr1 = report(config["path"] + "figures/ErrorRates_r1.png",category="QC reads"),
         plotErr2 = report(config["path"] + "figures/ErrorRates_r2.png",category="QC reads")
     threads:
@@ -80,7 +80,7 @@ rule learnErrorRates:
     log:
         config["path"] + "logs/dada2/learnErrorRates.txt"
     script:
-        "scripts/dada2/learnErrorRates.R"
+        "scripts/dada2/02_learnErrorRates.R"
 
 rule dereplicate:
     input:
@@ -100,7 +100,7 @@ rule dereplicate:
     log:
         config["path"] + "logs/dada2/dereplicate.txt"
     script:
-        "scripts/dada2/dereplicate.R"
+        "scripts/dada2/03_dereplicate.R"
 
 rule removeChimeras:
     input:
@@ -115,7 +115,7 @@ rule removeChimeras:
     log:
         config["path"] + "logs/dada2/removeChimeras.txt"
     script:
-        "scripts/dada2/removeChimeras.R"
+        "scripts/dada2/04_removeChimeras.R"
 
 rule prepare_dbOTU:
     input:
@@ -128,7 +128,7 @@ rule prepare_dbOTU:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/dada2/dbOTU.R"
+        "scripts/dada2/05_dbOTU.R"
         
 rule dbOTU:
     input:
@@ -153,7 +153,7 @@ rule import_dbOTU:
     log:
         log1 = config["path"] + "logs/import_dbOTU.log"
     script:
-        "scripts/dada2/dbOTU_into.R"
+        "scripts/dada2/06_dbOTU_into.R"
         
 rule dada2_taxonomy:
     input:
@@ -168,7 +168,7 @@ rule dada2_taxonomy:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/dada2/taxonomydada2.R"
+        "scripts/dada2/07_taxonomydada2.R"
         
 rule ID_taxa:
     input:
@@ -184,7 +184,7 @@ rule ID_taxa:
     log:
         config["path"] + "logs/dada2/IDtaxa_gtdb.txt"
     script:
-        "scripts/dada2/IDtaxa.R"
+        "scripts/dada2/08_IDtaxa.R"
                 
 rule filter_f:
     input:
@@ -203,7 +203,7 @@ rule filter_f:
     log:
         config["path"] + "logs/dada2/filter.txt"
     script:
-        "scripts/dada2/filter.R"
+        "scripts/dada2/09_filter.R"
         
 rule combine_read_counts:
     input:

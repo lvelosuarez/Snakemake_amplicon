@@ -1,5 +1,5 @@
-library(dada2)
-
+#!/usr/bin/Rscript
+suppressPackageStartupMessages(library(dada2))
 sink(snakemake@log[[1]])
 
 seqtab.all= readRDS(snakemake@input[['seqtab']]) # seqtab.all

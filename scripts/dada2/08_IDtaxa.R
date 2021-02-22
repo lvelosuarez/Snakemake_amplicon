@@ -1,7 +1,8 @@
-library(dada2)
-library(DECIPHER)
-library(tidyverse)
-library(magrittr)
+#!/usr/bin/Rscript
+suppressPackageStartupMessages(library(dada2))
+suppressPackageStartupMessages(library(DECIPHER))
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(magrittr))
 sink(snakemake@log[[1]])
 
 seqtab= readRDS(snakemake@input[['seqtab']]) # seqtab

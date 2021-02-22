@@ -1,4 +1,5 @@
-library(dada2)
+#!/usr/bin/Rscript
+suppressPackageStartupMessages(library(dada2))
 sink(snakemake@log[[1]])
 
 
@@ -48,7 +49,6 @@ saveRDS(seqtab.all, snakemake@output[['seqtab']])
 
 ## get N reads
 getNreads <- function(x) sum(getUniques(x))
-
 track <- cbind( sapply(dadaFs, getNreads), sapply(mergers, getNreads))
 colnames(track) <- c( "denoised", "merged")
 write.table(track,snakemake@output[['nreads']],sep='\t')

@@ -1,7 +1,8 @@
 #!/usr/bin/Rscript
-sink(snakemake@log[[1]])
 suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(Biostrings))
+
+sink(snakemake@log[[1]])
 
 seqtab= readRDS(snakemake@input[['seqtab']]) # seqtab
 tax <- readRDS(snakemake@input[['tax']])
