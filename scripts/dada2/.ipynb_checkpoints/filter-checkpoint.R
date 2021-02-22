@@ -1,8 +1,7 @@
 #!/usr/bin/Rscript
 sink(snakemake@log[[1]])
-library(tidyverse)
-library(Biostrings)
-library(phyloseq)
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(Biostrings))
 
 seqtab= readRDS(snakemake@input[['seqtab']]) # seqtab
 tax <- readRDS(snakemake@input[['tax']])
@@ -31,6 +30,7 @@ ggplot(l_hist,aes(x=length,y=count)) +
         axis.text.x = element_text(angle = 90, hjust = 1))
 ## and save the graph
 ggsave(snakemake@output[['plot_seqlength_nofilter']], width = 20, height = 8, units = "cm")
+dev.off() 
 ## Get seq length abundance and plot (how many sequences have this length?)
 a_hist <- tapply(rowSums(dplyr::select_if(R,is.numeric)), nchar(R$seqs),sum) %>% tibble("length"=names(.), "abundance"=.)
 #plot a_hist
@@ -45,6 +45,7 @@ ggplot(a_hist,aes(x=length,y=abundance)) +
         axis.text.x = element_text(angle = 90, hjust = 1))
 ## and save the graph
 ggsave(snakemake@output[['plot_seqabundance_nofilter']],, width = 20, height = 8, units = "cm")
+dev.off() 
 #################
 #
 # Filter by taxonomic assigments and replot
@@ -65,6 +66,7 @@ ggplot(lf_hist,aes(x=length,y=count)) +
         axis.text.x = element_text(angle = 90, hjust = 1))
 ## and save the graph
 ggsave(snakemake@output[['plot_seqlength']], width = 20, height = 8, units = "cm")
+dev.off() 
 ## Get seq length abundance and plot (how many sequences have this length?)
 b_hist <- tapply(rowSums(dplyr::select_if(R_f,is.numeric)), nchar(R_f$seqs),sum) %>% tibble("length"=names(.), "abundance"=.)
 #plot b_hist
@@ -79,6 +81,7 @@ ggplot(b_hist,aes(x=length,y=abundance)) +
         axis.text.x = element_text(angle = 90, hjust = 1))
 ## and save the graph
 ggsave(snakemake@output[['plot_seqabundance']],, width = 20, height = 8, units = "cm")
+dev.off() 
 ###########################
 ##
 ##

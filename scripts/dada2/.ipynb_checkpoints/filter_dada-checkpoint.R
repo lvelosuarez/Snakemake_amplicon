@@ -4,7 +4,7 @@ sink(snakemake@log[[1]])
 
 track.filt <- filterAndTrim(snakemake@input[['r1']],snakemake@output[['r1']], 
                             snakemake@input[['r2']],snakemake@output[['r2']], 
-                            maxEE=snakemake@config[["maxEE"]], 
+                            #maxEE=snakemake@config[["maxEE"]], 
                             compress=TRUE,
                             verbose=TRUE,
                             multithread=snakemake@threads)

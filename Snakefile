@@ -1,3 +1,4 @@
+configfile: "config.yaml"
 report: config["path"] + "report/workflow.rst"
 
 import os
@@ -41,7 +42,7 @@ rule CutPrimers:
         primer_f = config["FORWARD"],
         primer_r = config["REVERSE"]
     shell:
-        "cutadapt --discard-untrimmed -g ^{params.primer_f}  -G ^{params.primer_r} -o {output.r1} -p {output.r2} {input.r1} {input.r2}"   
+        "cutadapt --discard-untrimmed --trim-n -g ^{params.primer_f}  -G ^{params.primer_r} -o {output.r1} -p {output.r2} {input.r1} {input.r2}"   
 
         
 rule dada2_filter:

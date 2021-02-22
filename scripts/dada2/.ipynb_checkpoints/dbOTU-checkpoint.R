@@ -1,5 +1,5 @@
-library(Biostrings)
-library(tidyverse)
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(Biostrings))
 
 sink(snakemake@log[[1]])
 
