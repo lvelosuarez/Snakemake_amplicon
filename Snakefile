@@ -1,10 +1,11 @@
 configfile: "config.yaml"
-report: config["path"] + "report/workflow.rst"
+report: "workflow.rst"
 
 import os
 import pandas as pd
 SampleTable = pd.read_table(config['sampletable'],index_col=0)
 SAMPLES = list(SampleTable.index)
+#GROUPS = list(SampleTable["GROUP"])
     
 rule all:
     input:
@@ -17,6 +18,7 @@ rule all:
         
 
 include: "rules/count.smk"
+#include: "rules/lib1.smk"
 #include: "rules/qiime.smk"
 
 rule QC:
@@ -42,9 +44,8 @@ rule CutPrimers:
         primer_f = config["FORWARD"],
         primer_r = config["REVERSE"]
     shell:
-        "cutadapt --discard-untrimmed --trim-n -g ^{params.primer_f}  -G ^{params.primer_r} -o {output.r1} -p {output.r2} {input.r1} {input.r2}"   
-
-        
+        "cutadapt --discard-untrimmed --trim-n -g ^{params.primer_f}  -G ^{params.primer_r} -o {output.r1} -p {output.r2} {input.r1} {input.r2}" 
+            
 rule dada2_filter:
     input:
         r1 =  expand(config["path"] + "02_adapters/{sample}_R1.fastq.gz",sample=SAMPLES),
@@ -215,11 +216,12 @@ rule combine_read_counts:
         config["path"] + 'output/Nreads_chimera_removed.txt',
         config["path"] + "output/Nreads_length.txt"
     output:
-        report(config["path"] + 'output/Nreads.csv', category="QC reads")
+        report(config["path"] + 'output/Nreads.csv', category="QC reads"),
+        report(config["path"] + 'output/Nreads.html', category="QC reads")
     run:
         import pandas as pd
         import matplotlib
-        import matplotlib.pylab as plt
+        import altair as alt
 
         D = pd.read_table(input[0],sep=",",names=['gatc'],index_col=0)
         D = D.join(pd.read_table(input[1],sep=",",names=['quality'],index_col=0))
@@ -230,5 +232,20 @@ rule combine_read_counts:
         D = D.join(pd.read_table(input[6],index_col=1))
         D = D[['gatc','quality','adaptors','filtered','denoised','merged','nonchim','tax_filter']]
         D.to_csv(output[0],sep=',')
+        D['file_id'] = D.index.copy()
+        D = pd.melt(D, id_vars=['file_id'], value_vars=['gatc','quality','adaptors','filtered','denoised','merged','nonchim','tax_filter'], var_name='steps', value_name='reads')
+        input_dropdown = alt.binding_select(options=['gatc','quality','adaptors','filtered','denoised','merged','nonchim','tax_filter'])
+        selection = alt.selection_single(fields=['steps'], bind=input_dropdown, name='QC reads')
+        alt.Chart(D).mark_bar().encode(
+            x=alt.X('file_id:N'),
+            y='reads:Q',
+            tooltip = [alt.Tooltip('reads:Q'),alt.Tooltip('file_id:N')]
+        ).properties(width=1200,
+                    height=300
+        ).configure_axis(labelFontSize=15,
+                         titleFontSize=20
+        ).add_selection(selection).transform_filter(selection).save(output[1])
+
+
 onsuccess:
     print(":) HAPPY")
