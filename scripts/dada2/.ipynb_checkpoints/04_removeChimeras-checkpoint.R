@@ -6,12 +6,12 @@ seqtab.all= readRDS(snakemake@input[['seqtab']]) # seqtab.all
 
 
 # Remove chimeras
-seqtab <- removeBimeraDenovo(seqtab.all, method=snakemake@config[['chimera_method']], multithread=snakemake@threads)
+seqtab <- removeBimeraDenovo(seqtab.all, method=snakemake@config[['chimera_method']], multithread=snakemake@threads,verbose=TRUE)
+seqtable_nochim_collapse <- collapseNoMismatch(seqtab, verbose=TRUE)
+saveRDS(seqtable_nochim_collapse, snakemake@output[['seqtab']])
 
-saveRDS(seqtab, snakemake@output[['seqtab']])
-
-track <- rowSums(seqtab)
-names(track) <- row.names(seqtab)
+track <- rowSums(seqtable_nochim_collapse)
+names(track) <- row.names(seqtable_nochim_collapse)
 
 write.table(track,col.names = c("nonchim"),
             snakemake@output[['nreads']],sep='\t')
