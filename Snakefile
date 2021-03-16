@@ -3,53 +3,82 @@ report: "workflow.rst"
 
 import os
 import pandas as pd
-SampleTable = pd.read_table(config['sampletable'],index_col=0)
+SampleTable = pd.read_table(config['sampletable'])
+SampleTable = SampleTable.set_index(["sample_id"])
 SAMPLES = list(SampleTable.index)
-#GROUPS = list(SampleTable["GROUP"])
+GROUPS = list(SampleTable['GROUP'].unique())
     
 rule all:
     input:
-        config["path"] + "output/results.fasta", 
-        config["path"] + "output/results.rds",
-        config["path"] + "output/seqtab_dbOTU.rds",
-        config["path"] + "output/tax_gtdb.rds",
-        config["path"] + "output/tax_silva.rds",
-        config["path"] + "output/Nreads.csv",
+        config["path"] + "QC/multiqc_report.html",
+        #config["path"] + "output/results.fasta", 
+        #config["path"] + "output/results.rds",
+        #config["path"] + "output/seqtab_dbOTU.rds",
+        #config["path"] + "output/tax_gtdb.rds",
+        #config["path"] + "output/tax_silva.rds",
+        #config["path"] + "output/Nreads.csv",
         
 
 include: "rules/count.smk"
-#include: "rules/lib1.smk"
 #include: "rules/qiime.smk"
 
+rule cutadapt:
+    input:
+        [lambda wildcards: SampleTable.loc[wildcards.sample, 'R1'], lambda wildcards: SampleTable.loc[wildcards.sample, 'R2']]
+    output:
+        fastq1 = config["path"] + "01_adapters/{sample}_R1.fastq.gz",
+        fastq2 = config["path"] + "01_adapters/{sample}_R2.fastq.gz",
+        qc = config["path"] + "QC/{sample}.qc.txt"
+    params:
+        adapters ="-g ^NCTACGGGNGGCWGCAG -G ^GACTACHVGGGGTATCTAATCC",
+        extra = "--minimum-length 1 -q 20"
+    log:
+        "QC/{sample}.log"
+    wrapper:
+        "0.72.0/bio/cutadapt/pe"
 rule QC:
     input:
-        r1 = lambda wildcards: SampleTable.loc[wildcards.sample, 'R1'],
-        r2 = lambda wildcards: SampleTable.loc[wildcards.sample, 'R2']
+        r1 = config["path"] + "01_adapters/{sample}_R1.fastq.gz",
+        r2 = config["path"] + "01_adapters/{sample}_R2.fastq.gz",
     output:
-        r1 = config["path"] + "01_quality/{sample}_R1.fastq.gz",
-        r2 = config["path"] + "01_quality/{sample}_R2.fastq.gz"
+        r1 = config["path"] + "02_quality/{sample}_R1.fastq.gz",
+        r2 = config["path"] + "02_quality/{sample}_R2.fastq.gz"
     params:
         adapters = os.path.abspath("../../Useful_Files/adapters.fa"),
     shell:
-        "bbduk.sh in={input.r1} in2={input.r2} ref={params.adapters} out={output.r1} out2={output.r2} qtrim=r trimq=20  minlen=200 maq=20"
+        "bbduk.sh in={input.r1} in2={input.r2} ref={params.adapters} out={output.r1} out2={output.r2} qtrim=rl trimq=20  minlen=200 maq=20"
 
-rule CutPrimers:
-    input:
-        r1 = config["path"] + "01_quality/{sample}_R1.fastq.gz",
-        r2 = config["path"] + "01_quality/{sample}_R2.fastq.gz"
-    output:
-        r1 = config["path"] + "02_adapters/{sample}_R1.fastq.gz",
-        r2 = config["path"] + "02_adapters/{sample}_R2.fastq.gz"
-    params:
-        primer_f = config["FORWARD"],
-        primer_r = config["REVERSE"]
-    shell:
-        "cutadapt --discard-untrimmed --trim-n -g ^{params.primer_f}  -G ^{params.primer_r} -o {output.r1} -p {output.r2} {input.r1} {input.r2}" 
+rule fastqcR1:
+    input: 
+        config["path"] + "02_quality/{sample}_R1.fastq.gz"
+    output: 
+        html= config["path"] + "QC/{sample}_R1_fastqc.html",
+        zip = config["path"] + "QC/{sample}_R1_fastqc.zip"
+    wrapper: "0.72.0/bio/fastqc"
+
+rule fastqcR2:
+    input: 
+        config["path"] + "02_quality/{sample}_R2.fastq.gz"
+    output: 
+        html= config["path"] + "QC/{sample}_R2_fastqc.html",
+        zip = config["path"] + "QC/{sample}_R2_fastqc.zip"
+    wrapper: "0.72.0/bio/fastqc"
+
+rule multiqc:
+    input: 
+        expand([config["path"] + "QC/{sample}_R1_fastqc.html", 
+                config["path"] + "QC/{sample}_R1_fastqc.zip",
+                config["path"] + "QC/{sample}_R2_fastqc.html", 
+                config["path"] + "QC/{sample}_R2_fastqc.zip",
+                config["path"] + "QC/{sample}.qc.txt"],sample=SAMPLES)
+    output: 
+        config["path"] + "QC/multiqc_report.html"
+    wrapper:  "0.72.0/bio/multiqc"
             
 rule dada2_filter:
     input:
-        r1 =  expand(config["path"] + "02_adapters/{sample}_R1.fastq.gz",sample=SAMPLES),
-        r2 =  expand(config["path"] + "02_adapters/{sample}_R2.fastq.gz",sample=SAMPLES)
+        r1 =  expand(config["path"] + "02_quality/{sample}_R1.fastq.gz",sample=SAMPLES),
+        r2 =  expand(config["path"] + "02_quality/{sample}_R2.fastq.gz",sample=SAMPLES)
     output:
         r1 = expand(config["path"] + "03_dada2_filtered/{sample}_R1.fastq.gz",sample=SAMPLES),
         r2 = expand(config["path"] + "03_dada2_filtered/{sample}_R2.fastq.gz",sample=SAMPLES),
