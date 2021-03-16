@@ -11,12 +11,12 @@ GROUPS = list(SampleTable['GROUP'].unique())
 rule all:
     input:
         config["path"] + "QC/multiqc_report.html",
-        #config["path"] + "output/results.fasta", 
-        #config["path"] + "output/results.rds",
-        #config["path"] + "output/seqtab_dbOTU.rds",
-        #config["path"] + "output/tax_gtdb.rds",
-        #config["path"] + "output/tax_silva.rds",
-        #config["path"] + "output/Nreads.csv",
+        config["path"] + "output/results.fasta", 
+        config["path"] + "output/results.rds",
+        config["path"] + "output/seqtab_dbOTU.rds",
+        config["path"] + "output/tax_gtdb.rds",
+        config["path"] + "output/tax_silva.rds",
+        config["path"] + "output/Nreads.csv",
         
 
 include: "rules/count.smk"
