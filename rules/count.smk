@@ -15,7 +15,7 @@ rule count_raw_reads:
         """
 rule count_qc_reads:
     input:
-        r1 = expand(config["path"] + "01_quality/{sample}_R1.fastq.gz",sample=SAMPLES)
+        r1 = expand(config["path"] + "02_quality/{sample}_R1.fastq.gz",sample=sample_id)
     output:
         nreads= temp(config["path"] + "output/Nreads_quality.txt")
     params:
@@ -28,7 +28,7 @@ rule count_qc_reads:
         """
 rule count_cutadapter_reads:
     input:
-        r1 = expand(config["path"] + "02_adapters/{sample}_R1.fastq.gz",sample=SAMPLES)
+        r1 = expand(config["path"] + "01_adapters/{sample}_R1.fastq.gz",sample=sample_id)
     output:
         nreads= temp(config["path"] + "output/Nreads_adapters.txt")
     params:

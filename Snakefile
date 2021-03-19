@@ -15,11 +15,12 @@ import pandas as pd
 
 SampleTable = pd.read_csv(config['sampletable'], sep='\t', index_col=False)
 sample_id = list(SampleTable['sample_id'])
+i =["R1","R2"]
 
 rule all:
     input:
-        expand(config["path"] + "01_adapters/{sample}_R1.fastq.gz",sample=sample_id)
-        #config["path"] + "QC/multiqc_report.html",
+        #expand(config["path"] + "01_adapters/{sample}_R1.fastq.gz",sample=sample_id)
+        config["path"] + "QC/multiqc_report.html",
         #config["path"] + "output/results.fasta", 
         #config["path"] + "output/results.rds",
         #config["path"] + "output/seqtab_dbOTU.rds",
@@ -37,6 +38,7 @@ def get_raw_fastq(sample_id):
     return {'r1': r1, 'r2': r2}
 
 rule cutadapt:
+    ''' Run cutadapt before bbmap qc -- this way our qc can use right and left qtrim '''
     input: unpack(lambda wildcards: get_raw_fastq(wildcards.sample_id))
     output:
         fastq1 = config["path"] + "01_adapters/{sample_id}_R1.fastq.gz",
@@ -51,6 +53,7 @@ rule cutadapt:
         "0.72.0/bio/cutadapt/pe"
 
 rule QC:
+    ''' Older versions has qc before cutadapt / this change will allow to get rid of N and low quality reads in the right and left '''
     input:
         r1 = config["path"] + "01_adapters/{sample}_R1.fastq.gz",
         r2 = config["path"] + "01_adapters/{sample}_R2.fastq.gz",
@@ -62,29 +65,20 @@ rule QC:
     shell:
         "bbduk.sh in={input.r1} in2={input.r2} ref={params.adapters} out={output.r1} out2={output.r2} qtrim=rl trimq=20  minlen=200 maq=20"
 
-rule fastqcR1:
+rule fastqc:
+    ''' Older versions has qc before cutadapt / this change will allow to get rid of N and low quality reads in the right and left '''
     input: 
-        config["path"] + "02_quality/{sample}_R1.fastq.gz"
+        config["path"] + "02_quality/{sample}_{i}.fastq.gz"
     output: 
-        html= config["path"] + "QC/{sample}_R1_fastqc.html",
-        zip = config["path"] + "QC/{sample}_R1_fastqc.zip"
-    wrapper: "0.72.0/bio/fastqc"
-
-rule fastqcR2:
-    input: 
-        config["path"] + "02_quality/{sample}_R2.fastq.gz"
-    output: 
-        html= config["path"] + "QC/{sample}_R2_fastqc.html",
-        zip = config["path"] + "QC/{sample}_R2_fastqc.zip"
+        html= temp(config["path"] + "QC/{sample}_{i}_fastqc.html"),
+        zip = temp(config["path"] + "QC/{sample}_{i}_fastqc.zip")
     wrapper: "0.72.0/bio/fastqc"
 
 rule multiqc:
     input: 
-        expand([config["path"] + "QC/{sample}_R1_fastqc.html", 
-                config["path"] + "QC/{sample}_R1_fastqc.zip",
-                config["path"] + "QC/{sample}_R2_fastqc.html", 
-                config["path"] + "QC/{sample}_R2_fastqc.zip",
-                config["path"] + "QC/{sample}.qc.txt"],sample=sample_id)
+        expand([config["path"] + "QC/{sample}_{i}_fastqc.html", 
+                config["path"] + "QC/{sample}_{i}_fastqc.zip",
+                config["path"] + "QC/{sample}.qc.txt"],sample=sample_id,i=i)
     output: 
         config["path"] + "QC/multiqc_report.html"
     wrapper:  "0.72.0/bio/multiqc"
