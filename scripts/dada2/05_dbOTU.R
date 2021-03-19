@@ -1,5 +1,6 @@
-library(Biostrings)
-library(tidyverse)
+#!/usr/bin/Rscript
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(Biostrings))
 
 sink(snakemake@log[[1]])
 

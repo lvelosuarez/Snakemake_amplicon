@@ -1,74 +1,115 @@
-report: config["path"] + "workflow.rst"
+"""
+Author: L. Velo Suarez
+Affiliation: UMR-1078
+Aim: A simple Snakemake workflow to process paired-end 16S amplicon from Illumina reads (MiSeq)
+Run: snakemake --use-conda -j15   
+Latest modification: 
+  - todo
+"""
+
+configfile: "config.yaml"
+report: "workflow.rst"
 
 import os
 import pandas as pd
-SampleTable = pd.read_table(config['sampletable'],index_col=0)
-SAMPLES = list(SampleTable.index)
-    
+
+SampleTable = pd.read_csv(config['sampletable'], sep='\t', index_col=False)
+sample_id = list(SampleTable['sample_id'])
+i =["R1","R2"]
+group = list(SampleTable['GROUP'].unique())
+group_sizes = SampleTable['GROUP'].value_counts().to_dict()
+
 rule all:
     input:
+        config["path"] + "QC/multiqc_report.html",
         config["path"] + "output/results.fasta", 
         config["path"] + "output/results.rds",
+        config["path"] + "output/seqtab_dbOTU.rds",
         config["path"] + "output/tax_gtdb.rds",
         config["path"] + "output/tax_silva.rds",
-        config["path"] + "output/Nreads.tsv"
+        config["path"] + "output/Nreads.csv",
+        
+include: "rules/count.smk"
+#include: "rules/qiime.smk"
 
-include: "rules/count.smk"        
+def get_raw_fastq(sample_id):
+    ''' return a dict with the path to the raw fastq files'''
+    r1 = list(SampleTable[SampleTable["sample_id"] == sample_id]['R1'])[0].split(',')
+    r2 = list(SampleTable[SampleTable["sample_id"] == sample_id]['R2'])[0].split(',')
+    return {'r1': r1, 'r2': r2}
+
+rule cutadapt:
+    ''' Run cutadapt before bbmap qc -- this way our qc can use right and left qtrim '''
+    input: unpack(lambda wildcards: get_raw_fastq(wildcards.sample_id))
+    output:
+        fastq1 = config["path"] + "01_adapters/{sample_id}_R1.fastq.gz",
+        fastq2 = config["path"] + "01_adapters/{sample_id}_R2.fastq.gz",
+        qc = config["path"] + "QC/{sample_id}.qc.txt"
+    params:
+        adapters ="-g ^NCTACGGGNGGCWGCAG -G ^GACTACHVGGGGTATCTAATCC",
+        extra = "--minimum-length 1 -q 20"
+    log:
+        config["path"] + "QC/{sample_id}_.log"
+    wrapper:
+        "0.72.0/bio/cutadapt/pe"
 
 rule QC:
+    ''' Older versions has qc before cutadapt / this change will allow to get rid of N and low quality reads in the right and left '''
     input:
-        r1 = lambda wildcards: SampleTable.loc[wildcards.sample, 'R1'],
-        r2 = lambda wildcards: SampleTable.loc[wildcards.sample, 'R2']
+        r1 = config["path"] + "01_adapters/{sample}_R1.fastq.gz",
+        r2 = config["path"] + "01_adapters/{sample}_R2.fastq.gz",
     output:
-        r1 = config["path"] + "quality/{sample}_R1.fastq.gz",
-        r2 = config["path"] + "quality/{sample}_R2.fastq.gz"
+        r1 = config["path"] + "02_quality/{sample}_R1.fastq.gz",
+        r2 = config["path"] + "02_quality/{sample}_R2.fastq.gz"
     params:
         adapters = os.path.abspath("../../Useful_Files/adapters.fa"),
     shell:
-        "bbduk.sh in={input.r1} in2={input.r2} ref={params.adapters} out={output.r1} out2={output.r2} qtrim=r trimq=20  minlen=200 maq=20"
+        "bbduk.sh in={input.r1} in2={input.r2} ref={params.adapters} out={output.r1} out2={output.r2} qtrim=rl trimq=20  minlen=200 maq=20"
 
-rule CutPrimers:
-    input:
-        r1 = config["path"] + "quality/{sample}_R1.fastq.gz",
-        r2 = config["path"] + "quality/{sample}_R2.fastq.gz"
-    output:
-        r1 = config["path"] + "adapters/{sample}_R1.fastq.gz",
-        r2 = config["path"] + "adapters/{sample}_R2.fastq.gz"
-    params:
-        primer_f = config["FORWARD"],
-        primer_r = config["REVERSE"]
-    shell:
-        "cutadapt --discard-untrimmed -g ^{params.primer_f}  -G ^{params.primer_r} -o {output.r1} -p {output.r2} {input.r1} {input.r2}"   
+rule fastqc:
+    ''' Older versions has qc before cutadapt / this change will allow to get rid of N and low quality reads in the right and left '''
+    input: 
+        config["path"] + "02_quality/{sample}_{i}.fastq.gz"
+    output: 
+        html= temp(config["path"] + "QC/{sample}_{i}_fastqc.html"),
+        zip = temp(config["path"] + "QC/{sample}_{i}_fastqc.zip")
+    wrapper: "0.72.0/bio/fastqc"
 
-        
+rule multiqc:
+    input: 
+        expand([config["path"] + "QC/{sample}_{i}_fastqc.html", 
+                config["path"] + "QC/{sample}_{i}_fastqc.zip",
+                config["path"] + "QC/{sample}.qc.txt"],sample=sample_id,i=i)
+    output: 
+        config["path"] + "QC/multiqc_report.html"
+    wrapper:  "0.72.0/bio/multiqc"
+
 rule dada2_filter:
-    input:
-        r1 =  expand(config["path"] + "adapters/{sample}_R1.fastq.gz",sample=SAMPLES),
-        r2 =  expand(config["path"] + "adapters/{sample}_R2.fastq.gz",sample=SAMPLES)
+    input: 
+        r1 = expand(config["path"] + "02_quality/{sample}_R1.fastq.gz",sample=sample_id),
+        r2 = expand(config["path"] + "02_quality/{sample}_R2.fastq.gz",sample=sample_id)
     output:
-        r1 = expand(config["path"] + "dada2_filtered/{sample}_R1.fastq.gz",sample=SAMPLES),
-        r2 = expand(config["path"] + "dada2_filtered/{sample}_R2.fastq.gz",sample=SAMPLES),
-        nreads= temp(config["path"] + "output/Nreads_filtered.txt")
+        r1 = expand(config["path"] + "03_dada2_filtered/{sample}_R1.fastq.gz",sample=sample_id),
+        r2 = expand(config["path"] + "03_dada2_filtered/{sample}_R2.fastq.gz",sample=sample_id),
+        nreads = temp(config["path"] + 'output/Nreads_filtered.txt')
     params:
-        samples=SAMPLES
+        samples=sample_id
     threads:
         config['threads']
     conda:
         "envs/dada2.yaml"
-    log:
-        config["path"] + "logs/dada2/filter.txt"
     script:
-        "scripts/dada2/filter.R"
+        "scripts/dada2/01_filter_dada.R"
         
 rule learnErrorRates:
     input:
-        r1= rules.dada2_filter.output.r1,
-        r2= rules.dada2_filter.output.r2
+        r1 = expand(config["path"] + "03_dada2_filtered/{sample}_R1.fastq.gz",sample=sample_id),
+        r2 = expand(config["path"] + "03_dada2_filtered/{sample}_R2.fastq.gz",sample=sample_id)
     output:
-        err_r1= config["path"] + "model/ErrorRates_r1.rds",
-        err_r2 = config["path"] + "model/ErrorRates_r2.rds",
-        plotErr1 = config["path"] + "figures/ErrorRates_r1.pdf",
-        plotErr2 = config["path"] + "figures/ErrorRates_r2.pdf"
+        err_r1= config["path"] + "04_model/ErrorRates_r1.rds",
+        err_r2 = config["path"] + "04_model/ErrorRates_r2.rds",
+        plotErr1 = report(config["path"] + "figures/ErrorRates_r1.png",category="QC reads"),
+        plotErr2 = report(config["path"] + "figures/ErrorRates_r2.png",category="QC reads")
     threads:
         config['threads']
     conda:
@@ -76,7 +117,7 @@ rule learnErrorRates:
     log:
         config["path"] + "logs/dada2/learnErrorRates.txt"
     script:
-        "scripts/dada2/learnErrorRates.R"
+        "scripts/dada2/02_learnErrorRates.R"
 
 rule dereplicate:
     input:
@@ -88,7 +129,7 @@ rule dereplicate:
         seqtab = temp(config["path"] + "output/seqtab_with_chimeras.rds"),
         nreads = temp(config["path"] + "output/Nreads_dereplicated.txt")
     params:
-        samples = SAMPLES
+        samples = sample_id
     threads:
         config['threads']
     conda:
@@ -96,7 +137,7 @@ rule dereplicate:
     log:
         config["path"] + "logs/dada2/dereplicate.txt"
     script:
-        "scripts/dada2/dereplicate.R"
+        "scripts/dada2/03_dereplicate.R"
 
 rule removeChimeras:
     input:
@@ -111,7 +152,7 @@ rule removeChimeras:
     log:
         config["path"] + "logs/dada2/removeChimeras.txt"
     script:
-        "scripts/dada2/removeChimeras.R"
+        "scripts/dada2/04_removeChimeras.R"
 
 rule prepare_dbOTU:
     input:
@@ -124,7 +165,7 @@ rule prepare_dbOTU:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/dada2/dbOTU.R"
+        "scripts/dada2/05_dbOTU.R"
         
 rule dbOTU:
     input:
@@ -143,34 +184,17 @@ rule import_dbOTU:
         dbOTU = rules.dbOTU.output.tsv_out,
         seqtab = rules.removeChimeras.output.seqtab
     output:
-        rds = temp(config["path"] + "output/seqtab_dbOTU.rds")
+        rds = config["path"] + "output/seqtab_dbOTU.rds"
     conda:
         "envs/dada2.yaml"
     log:
         log1 = config["path"] + "logs/import_dbOTU.log"
     script:
-        "scripts/dada2/dbOTU_into.R"
+        "scripts/dada2/06_dbOTU_into.R"
         
-        
-rule filterLength:
-    input:
-        seqtab= rules.import_dbOTU.output.rds
-    output:
-        plot_seqlength = config["path"] + "figures/Lengths/Sequence_Length_distribution.pdf",
-        plot_seqabundance = config["path"] + "figures/Lengths/Sequence_Length_distribution_abundance.pdf",
-        rds= temp(config["path"] + "output/seqtab.rds"),
-    threads:
-        1
-    conda:
-        "envs/dada2.yaml"
-    log:
-        config["path"] + "logs/dada2/filterLength.txt"
-    script:
-        "scripts/dada2/filterLength.R"
-
 rule dada2_taxonomy:
     input:
-        seqtab = rules.filterLength.output.rds
+        seqtab = rules.import_dbOTU.output.rds
     output:
         tax = config["path"] + "output/tax_silva.rds"
     params:
@@ -181,11 +205,11 @@ rule dada2_taxonomy:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/dada2/taxonomydada2.R"
+        "scripts/dada2/07_taxonomydada2.R"
         
 rule ID_taxa:
     input:
-        seqtab = rules.filterLength.output.rds,
+        seqtab = rules.import_dbOTU.output.rds
     output:
         taxonomy= config["path"] + "output/tax_gtdb.rds"
     params:
@@ -197,22 +221,26 @@ rule ID_taxa:
     log:
         config["path"] + "logs/dada2/IDtaxa_gtdb.txt"
     script:
-        "scripts/dada2/IDtaxa.R"
-        
-        
-rule dada2_end:
+        "scripts/dada2/08_IDtaxa.R"
+                
+rule filter_f:
     input:
-        seqtab = rules.filterLength.output.rds,
+        seqtab = rules.import_dbOTU.output.rds,
         tax = rules.dada2_taxonomy.output.tax
     output:
+        plot_seqlength_nofilter = report(config["path"] + "figures/Sequence_Length_distribution.png", category="QC reads"),
+        plot_seqabundance_nofilter = report(config["path"] + "figures/Sequence_Length_distribution_abundance.png", category ="QC reads"),
+        plot_seqlength = report(config["path"] + "figures/Sequence_Length_distribution_filtered.png", category="QC reads"),
+        plot_seqabundance = report(config["path"] + "figures/Sequence_Length_distribution_abundance_filtered.png", category ="QC reads"),
         fasta = config["path"] + "output/results.fasta",
-        rds = config["path"] + "output/results.rds"
+        nreads= temp(config["path"] + "output/Nreads_length.txt"),
+        rds = config["path"] + "output/results.rds",
     conda:
         "envs/dada2.yaml"
     log:
-        log1 = config["path"] + "logs/dada2_end.log"
+        config["path"] + "logs/dada2/filter.txt"
     script:
-        "scripts/dada2/dada2_end.R"
+        "scripts/dada2/09_filter.R"
         
 rule combine_read_counts:
     input:
@@ -221,21 +249,39 @@ rule combine_read_counts:
         config["path"] + 'output/Nreads_adapters.txt',
         config["path"] + 'output/Nreads_filtered.txt',
         config["path"] + 'output/Nreads_dereplicated.txt',
-        config["path"] + 'output/Nreads_chimera_removed.txt'
+        config["path"] + 'output/Nreads_chimera_removed.txt',
+        config["path"] + "output/Nreads_length.txt"
     output:
-        report(config["path"] + 'output/Nreads.tsv',category="read lost")
+        report(config["path"] + 'output/Nreads.csv', category="QC reads"),
+        report(config["path"] + 'output/Nreads.html', category="QC reads")
     run:
         import pandas as pd
         import matplotlib
-        import matplotlib.pylab as plt
+        import altair as alt
 
-        D = pd.read_table(input[0],sep=",",names=['00_raw'],index_col=0)
+        D = pd.read_table(input[0],sep=",",names=['gatc'],index_col=0)
         D = D.join(pd.read_table(input[1],sep=",",names=['quality'],index_col=0))
         D = D.join(pd.read_table(input[2],sep=",",names=['adaptors'],index_col=0))
         D = D.join(pd.read_table(input[3],index_col=0))
         D = D.join(pd.read_table(input[4],index_col=0))
         D = D.join(pd.read_table(input[5],squeeze=True,index_col=0))
-        D = D[['00_raw','quality','adaptors','filtered','denoised','merged','nonchim']]
-        D.to_csv(output[0],sep='\t')
+        D = D.join(pd.read_table(input[6],index_col=1))
+        D = D[['gatc','quality','adaptors','filtered','denoised','merged','nonchim','tax_filter']]
+        D.to_csv(output[0],sep=',')
+        D['file_id'] = D.index.copy()
+        D = pd.melt(D, id_vars=['file_id'], value_vars=['gatc','quality','adaptors','filtered','denoised','merged','nonchim','tax_filter'], var_name='steps', value_name='reads')
+        input_dropdown = alt.binding_select(options=['gatc','quality','adaptors','filtered','denoised','merged','nonchim','tax_filter'])
+        selection = alt.selection_single(fields=['steps'], bind=input_dropdown, name='QC reads')
+        alt.Chart(D).mark_bar().encode(
+            x=alt.X('file_id:N'),
+            y='reads:Q',
+            tooltip = [alt.Tooltip('reads:Q'),alt.Tooltip('file_id:N')]
+        ).properties(width=1200,
+                    height=300
+        ).configure_axis(labelFontSize=15,
+                         titleFontSize=20
+        ).add_selection(selection).transform_filter(selection).save(output[1])
+
+
 onsuccess:
     print(":) HAPPY")

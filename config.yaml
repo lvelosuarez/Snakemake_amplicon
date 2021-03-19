@@ -2,20 +2,18 @@
 # In case of sample based data, it should be complemented by a samples.tsv file that contains
 # one row per sample. It can be parsed easily via pandas.
 
-sampletable: "LUMI_2_adapters.tsv"
-FORWARD: CCTACGGGNGGCWGCAG
+sampletable: "test.tsv"
+FORWARD: NCTACGGGNGGCWGCAG
 REVERSE: GACTACHVGGGGTATCTAATCC
-path: "/home/lvelo/working_directory/microbiology/LUMI_2/adapter_trimmed_snakemake/"
+path: "/home/lvelo/working_directory/microbiology/test/"
 threads: 15
 maxEE:
   - 2
   - 2
 learn_nbases: 100e6
-chimera_method: "consensus"
-max_length_variation: 200     # how many nucleotide can a sequence be longer or shorter than the mode sequence length
+chimera_method: "pooled"
+max_length_variation: 30     # how many nucleotide can a sequence be longer or shorter than the mode sequence length
 
 silva: "/home/lvelo/working_directory/tax/silva_nr_v138_train_set.fa.gz"
 silva_species: "/home/lvelo/working_directory/tax/silva_species_assignment_v138.fa.gz"
 GTDB: "/home/lvelo/working_directory/tax/IDTaxa/GTDB_r95-mod_August2020.rdata"
-
-                        

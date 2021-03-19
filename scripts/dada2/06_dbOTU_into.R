@@ -1,4 +1,5 @@
-library(tidyverse)
+#!/usr/bin/Rscript
+suppressPackageStartupMessages(library(tidyverse))
 sink(snakemake@log[[1]])
 
 seqtab= readRDS(snakemake@input[['seqtab']]) 
