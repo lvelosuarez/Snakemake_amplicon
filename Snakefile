@@ -16,17 +16,18 @@ import pandas as pd
 SampleTable = pd.read_csv(config['sampletable'], sep='\t', index_col=False)
 sample_id = list(SampleTable['sample_id'])
 i =["R1","R2"]
+group = list(SampleTable['GROUP'].unique())
+group_sizes = SampleTable['GROUP'].value_counts().to_dict()
 
 rule all:
     input:
-        #expand(config["path"] + "01_adapters/{sample}_R1.fastq.gz",sample=sample_id)
         config["path"] + "QC/multiqc_report.html",
-        #config["path"] + "output/results.fasta", 
-        #config["path"] + "output/results.rds",
-        #config["path"] + "output/seqtab_dbOTU.rds",
-        #config["path"] + "output/tax_gtdb.rds",
-        #config["path"] + "output/tax_silva.rds",
-        #config["path"] + "output/Nreads.csv",
+        config["path"] + "output/results.fasta", 
+        config["path"] + "output/results.rds",
+        config["path"] + "output/seqtab_dbOTU.rds",
+        config["path"] + "output/tax_gtdb.rds",
+        config["path"] + "output/tax_silva.rds",
+        config["path"] + "output/Nreads.csv",
         
 include: "rules/count.smk"
 #include: "rules/qiime.smk"
@@ -82,23 +83,21 @@ rule multiqc:
     output: 
         config["path"] + "QC/multiqc_report.html"
     wrapper:  "0.72.0/bio/multiqc"
-            
+
 rule dada2_filter:
-    input:
-        r1 =  expand(config["path"] + "02_quality/{sample}_R1.fastq.gz",sample=sample_id),
-        r2 =  expand(config["path"] + "02_quality/{sample}_R2.fastq.gz",sample=sample_id)
+    input: 
+        r1 = expand(config["path"] + "02_quality/{sample}_R1.fastq.gz",sample=sample_id),
+        r2 = expand(config["path"] + "02_quality/{sample}_R2.fastq.gz",sample=sample_id)
     output:
         r1 = expand(config["path"] + "03_dada2_filtered/{sample}_R1.fastq.gz",sample=sample_id),
         r2 = expand(config["path"] + "03_dada2_filtered/{sample}_R2.fastq.gz",sample=sample_id),
-        nreads= temp(config["path"] + "output/Nreads_filtered.txt")
+        nreads = temp(config["path"] + 'output/Nreads_filtered.txt')
     params:
         samples=sample_id
     threads:
         config['threads']
     conda:
         "envs/dada2.yaml"
-    log:
-        config["path"] + "logs/dada2/filter.txt"
     script:
         "scripts/dada2/01_filter_dada.R"
         
