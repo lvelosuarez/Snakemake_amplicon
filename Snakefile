@@ -2,7 +2,8 @@
 Author: L. Velo Suarez
 Affiliation: UMR-1078
 Aim: A simple Snakemake workflow to process paired-end 16S amplicon from Illumina reads (MiSeq)
-Run: snakemake --use-conda -j15   
+Run: snakemake --use-conda -j15 
+Run for dag : snakemake --dag | dot -Tsvg > dag.svg
 Latest modification: 
   - todo
 """
@@ -63,8 +64,9 @@ rule QC:
         r2 = config["path"] + "02_quality/{sample}_R2.fastq.gz"
     params:
         adapters = os.path.abspath("../../Useful_Files/adapters.fa"),
+        q = config['quality']
     shell:
-        "bbduk.sh in={input.r1} in2={input.r2} ref={params.adapters} out={output.r1} out2={output.r2} qtrim=rl trimq=20  minlen=200 maq=20"
+        "bbduk.sh in={input.r1} in2={input.r2} ref={params.adapters} out={output.r1} out2={output.r2} qtrim=rl trimq={params.q}  minlen=200 maq={params.q}"
 
 rule fastqc:
     ''' Older versions has qc before cutadapt / this change will allow to get rid of N and low quality reads in the right and left '''
@@ -266,7 +268,7 @@ rule combine_read_counts:
         D = D.join(pd.read_table(input[4],index_col=0))
         D = D.join(pd.read_table(input[5],squeeze=True,index_col=0))
         D = D.join(pd.read_table(input[6],index_col=1))
-        D = D[['gatc','quality','adaptors','filtered','denoised','merged','nonchim','tax_filter']]
+        D = D[['gatc','adaptors','quality','filtered','denoised','merged','nonchim','tax_filter']]
         D.to_csv(output[0],sep=',')
         D['file_id'] = D.index.copy()
         D = pd.melt(D, id_vars=['file_id'], value_vars=['gatc','quality','adaptors','filtered','denoised','merged','nonchim','tax_filter'], var_name='steps', value_name='reads')
