@@ -4,6 +4,7 @@ Affiliation: UMR-1078
 Aim: A simple Snakemake workflow to process paired-end 16S amplicon from Illumina reads (MiSeq)
 Run: snakemake --use-conda -j15 
 Run for dag : snakemake --dag | dot -Tsvg > dag.svg
+Run for report : snakemake --report report.html (after run)
 Latest modification: 
   - todo
 """
@@ -17,8 +18,8 @@ import pandas as pd
 SampleTable = pd.read_csv(config['sampletable'], sep='\t', index_col=False)
 sample_id = list(SampleTable['sample_id'])
 i =["R1","R2"]
-group = list(SampleTable['GROUP'].unique())
-group_sizes = SampleTable['GROUP'].value_counts().to_dict()
+#group = list(SampleTable['GROUP'].unique())
+#group_sizes = SampleTable['GROUP'].value_counts().to_dict()
 
 rule all:
     input:
@@ -29,9 +30,10 @@ rule all:
         config["path"] + "output/tax_gtdb.rds",
         config["path"] + "output/tax_silva.rds",
         config["path"] + "output/Nreads.csv",
+        config["path"] + "output/tree.nwk"
         
 include: "rules/count.smk"
-#include: "rules/qiime.smk"
+include: "rules/qiime.smk"
 
 def get_raw_fastq(sample_id):
     ''' return a dict with the path to the raw fastq files'''
@@ -50,7 +52,7 @@ rule cutadapt:
         adapters ="-g ^NCTACGGGNGGCWGCAG -G ^GACTACHVGGGGTATCTAATCC",
         extra = "--minimum-length 1 -q 20"
     log:
-        config["path"] + "QC/{sample_id}_.log"
+        config["path"] + "QC/{sample_id}.log"
     wrapper:
         "0.72.0/bio/cutadapt/pe"
 

@@ -8,7 +8,7 @@ rule count_raw_reads:
     params:
         awk = """awk '!/file/{print $1,$4}'"""
     threads:
-        config['threads']
+        15 #config['threads']
     shell:
         """ 
         seqkit stats -j {threads} --basename {input.r1} | {params.awk} | sed 's/_R1.fastq.gz//' | sed 's/,//'| sed 's/ /,/' > {output.nreads}
