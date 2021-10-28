@@ -15,7 +15,7 @@ report: "workflow.rst"
 import os
 import pandas as pd
 
-SampleTable = pd.read_csv(config['sampletable'], sep='\t', index_col=False)
+SampleTable = pd.read_csv(config["path"] + config['sampletable'], sep='\t', index_col=False)
 sample_id = list(SampleTable['sample_id'])
 i =["R1","R2"]
 #group = list(SampleTable['GROUP'].unique())
@@ -49,8 +49,8 @@ rule cutadapt:
         fastq2 = config["path"] + "01_adapters/{sample_id}_R2.fastq.gz",
         qc = config["path"] + "QC/{sample_id}.qc.txt"
     params:
-        adapters ="-g ^NCTACGGGNGGCWGCAG -G ^GACTACHVGGGGTATCTAATCC",
-        extra = "--minimum-length 1 -q 20"
+        adapters ="-g CTACGGGNGGCWGCAG -G GACTACHVGGGGTATCTAATCC",
+        extra = "--discard-untrimmed"
     log:
         config["path"] + "QC/{sample_id}.log"
     wrapper:
@@ -68,7 +68,7 @@ rule QC:
         adapters = os.path.abspath("../../Useful_Files/adapters.fa"),
         q = config['quality']
     shell:
-        "bbduk.sh in={input.r1} in2={input.r2} ref={params.adapters} out={output.r1} out2={output.r2} qtrim=rl trimq={params.q}  minlen=200 maq={params.q}"
+        "bbduk.sh in={input.r1} in2={input.r2} ref={params.adapters} out={output.r1} out2={output.r2} qtrim=rl trimq={params.q}  minlen=200"
 
 rule fastqc:
     ''' Older versions has qc before cutadapt / this change will allow to get rid of N and low quality reads in the right and left '''

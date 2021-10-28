@@ -2,12 +2,10 @@
 # In case of sample based data, it should be complemented by a samples.tsv file that contains
 # one row per sample. It can be parsed easily via pandas.
 
-sampletable: "BAL.tsv"
-FORWARD: NCTACGGGNGGCWGCAG
-REVERSE: GACTACHVGGGGTATCTAATCC
-path: "/home/lvelo/working_directory/microbiology/PHY1801/"
+sampletable: "config.tsv"
+path: "/PROJECTS/GAZEL_ADN/microbiota/16S/"
 threads: 20
-quality: 20
+quality: 13
 maxEE:
   - 2
   - 2
